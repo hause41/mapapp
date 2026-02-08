@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>お支払い完了 - 地図PDF作成サービス</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .success-container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: #d5f4e6;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            font-size: 40px;
+        }
+
+        .success-container h2 {
+            color: #27ae60;
+            margin-bottom: 16px;
+        }
+
+        .success-container p {
+            color: #666;
+            margin-bottom: 12px;
+        }
+
+        .plan-info {
+            background: #f9f9f9;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 24px 0;
+        }
+
+        .plan-info p {
+            margin: 8px 0;
+        }
+
+        .plan-info .plan-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .actions {
+            margin-top: 24px;
+        }
+
+        .actions a {
+            display: inline-block;
+            padding: 14px 32px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin: 8px;
+        }
+
+        .actions .submit-btn {
+            background: #3498db;
+            color: white;
+        }
+
+        .actions .submit-btn:hover {
+            background: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>地図PDF作成サービス</h1>
+        </header>
+
+        <div class="success-container">
+            <div class="success-icon">✓</div>
+            <h2>お支払いが完了しました</h2>
+            <p>ご登録ありがとうございます。</p>
+            <p>プランがアップグレードされました。</p>
+
+            <div class="plan-info">
+                <p class="plan-name">{{ plan_name }}プラン</p>
+                <p>月間利用回数: {{ limit }}回</p>
+            </div>
+
+            <div class="actions">
+                <a href="/" class="submit-btn">地図PDFを作成する</a>
+            </div>
+        </div>
+
+        <footer>
+            <p>外構・エクステリア業者様向け 地図PDF作成サービス</p>
+        </footer>
+    </div>
+</body>
+</html>

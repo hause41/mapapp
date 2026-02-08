@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>利用上限に達しました - 地図PDF作成サービス</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>地図PDF作成サービス</h1>
+        </header>
+
+        <div class="limit-message">
+            <h2>今月の利用上限に達しました</h2>
+            <p>{{ plan_name }}プランの月間上限（{{ limit }}回）に達したため、今月はこれ以上PDFを作成できません。</p>
+
+            <div class="limit-options">
+                <h3>対処方法</h3>
+                <ul>
+                    <li>来月1日にリセットされるまでお待ちください</li>
+                    <li>上位プランにアップグレードして上限を増やす</li>
+                </ul>
+            </div>
+
+            <div class="plan-comparison">
+                <h3>プラン比較</h3>
+                <table>
+                    <tr>
+                        <th>プラン</th>
+                        <th>月間上限</th>
+                        <th>月額</th>
+                    </tr>
+                    <tr>
+                        <td>DEMO</td>
+                        <td>5回</td>
+                        <td>無料</td>
+                    </tr>
+                    <tr>
+                        <td>ライト</td>
+                        <td>20回</td>
+                        <td>500円</td>
+                    </tr>
+                    <tr>
+                        <td>スタンダード</td>
+                        <td>50回</td>
+                        <td>980円</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="limit-actions">
+                <a href="/pricing" class="submit-btn">プランをアップグレード</a>
+                <a href="/" class="map-btn" style="display: inline-block; margin-left: 10px; padding: 14px 32px; text-decoration: none;">トップに戻る</a>
+            </div>
+        </div>
+
+        <footer>
+            <p>外構・エクステリア業者様向け 地図PDF作成サービス</p>
+        </footer>
+    </div>
+</body>
+</html>

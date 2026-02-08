@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地図PDF作成サービス</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>地図PDF作成サービス</h1>
+            <p class="subtitle">現調用 地図PDFを簡単作成</p>
+        </header>
+
+        {% if user %}
+        <!-- ログイン時：ユーザー情報バー -->
+        <div class="user-bar">
+            <div class="user-info">
+                <span class="user-email">{{ user.email }}</span>
+                <span class="user-plan">
+                    <a href="/pricing" style="color: inherit; text-decoration: underline;">{{ plan_name }}</a>
+                    | 残り {{ remaining }}/{{ limit }}回
+                </span>
+            </div>
+            <a href="/logout" class="logout-btn">ログアウト</a>
+        </div>
+
+        {% if remaining == 0 %}
+        <div class="error-message">
+            今月の利用上限に達しました。来月1日にリセットされます。
+        </div>
+        {% elif remaining <= 3 %}
+        <div class="warning-message">
+            残り{{ remaining }}回です。
+        </div>
+        {% endif %}
+
+        <form id="pdfForm" action="/generate-pdf" method="post">
+            <div class="form-group">
+                <label for="customer">得意先</label>
+                <input type="text" id="customer" name="customer" placeholder="例: 株式会社○○">
+            </div>
+
+            <div class="form-group">
+                <label for="property_name">物件名</label>
+                <input type="text" id="property_name" name="property_name" placeholder="例: ○○邸 新築外構工事">
+            </div>
+
+            <div class="form-group">
+                <label for="address">住所</label>
+                <input type="text" id="address" name="address" placeholder="例: 東京都渋谷区...">
+            </div>
+
+            <div class="form-group">
+                <label for="coordinates">座標 または Google Maps URL</label>
+                <input type="text" id="coordinates" name="coordinates" placeholder="例: 35.6812,139.7671 または Google Maps URL">
+                <small>住所または座標のどちらか一方を入力。Google Mapsの「共有」URLも使えます。</small>
+            </div>
+
+            <div class="form-group">
+                <label>車種</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="vehicle_type" value="車種指定なし" checked>
+                        車種指定なし
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="vehicle_type" value="3t以下">
+                        3t以下
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="vehicle_type" value="4t（大型車進入不可）">
+                        4t（大型車進入不可）
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="vehicle_type" value="7t（大型車進入可）">
+                        7t（大型車進入可）
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="remarks">備考（最大200文字）</label>
+                <textarea id="remarks" name="remarks" rows="3" maxlength="200" placeholder="現調時の注意点など"></textarea>
+            </div>
+
+            <div class="button-group">
+                <button type="button" class="map-btn" id="mapBtn">
+                    地図を表示
+                </button>
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    PDF資料を作成
+                </button>
+            </div>
+        </form>
+
+        <!-- QRコード表示エリア -->
+        <div id="qrcodeArea" style="display: none; background: white; border-radius: 12px; padding: 20px; margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center;">
+            <h3 style="margin-bottom: 12px; color: #2c3e50;">Google Maps QRコード</h3>
+            <p style="color: #666; font-size: 0.9rem; margin-bottom: 16px;">スマホで読み取るとGoogle Mapsアプリが開きます</p>
+            <img id="qrcodeImg" src="" alt="QRコード" style="max-width: 200px; border: 1px solid #eee; border-radius: 8px;">
+            <p id="qrcodeCoords" style="color: #999; font-size: 0.85rem; margin-top: 12px;"></p>
+        </div>
+
+        {% else %}
+        <!-- 非ログイン時：ログイン案内 -->
+        <div class="login-prompt">
+            <h2>ログインが必要です</h2>
+            <p>地図PDF作成サービスをご利用いただくには、ログインが必要です。</p>
+            <div class="login-buttons">
+                <a href="/login" class="submit-btn">ログイン</a>
+                <a href="/register" class="map-btn">新規登録</a>
+            </div>
+            <div class="features">
+                <h3>サービスの特徴</h3>
+                <ul>
+                    <li>住所を入力するだけで地図PDFを自動生成</li>
+                    <li>広域地図と詳細地図の2枚セット</li>
+                    <li>作成したPDFを印刷・メールで簡単共有</li>
+                    <li>現調前の段取り・資料作成を時短</li>
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        <footer>
+            <p>外構・エクステリア業者様向け 地図PDF作成サービス</p>
+        </footer>
+    </div>
+
+    {% if user %}
+    <script>
+        // PDF作成ボタン
+        document.getElementById('pdfForm').addEventListener('submit', function(e) {
+            const address = document.getElementById('address').value.trim();
+            const coordinates = document.getElementById('coordinates').value.trim();
+            if (!address && !coordinates) {
+                e.preventDefault();
+                alert('住所または座標（Google Maps URL）のどちらかを入力してください。');
+                return;
+            }
+
+            const btn = document.getElementById('submitBtn');
+            btn.textContent = '作成中...';
+            btn.disabled = true;
+
+            setTimeout(function() {
+                btn.textContent = 'PDF資料を作成';
+                btn.disabled = false;
+            }, 10000);
+        });
+
+        // Google Maps URL自動検出（座標欄にURLを貼った時）
+        document.getElementById('coordinates').addEventListener('paste', function(e) {
+            setTimeout(async () => {
+                const val = this.value.trim();
+                if (!val.startsWith('http')) return;
+
+                try {
+                    const resp = await fetch('/parse-maps-url?url=' + encodeURIComponent(val));
+                    const data = await resp.json();
+                    if (!data.error) {
+                        this.value = data.lat + ',' + data.lng;
+                        showQRCode(data.lat, data.lng);
+                    }
+                } catch (err) {
+                    // URLパース失敗時はそのまま
+                }
+            }, 100);
+        });
+
+        // QRコード表示関数
+        async function showQRCode(lat, lng) {
+            try {
+                const resp = await fetch(`/generate-qrcode?lat=${lat}&lng=${lng}`);
+                const data = await resp.json();
+                if (!data.error) {
+                    document.getElementById('qrcodeImg').src = data.qrcode;
+                    document.getElementById('qrcodeCoords').textContent = `座標: ${lat}, ${lng}`;
+                    document.getElementById('qrcodeArea').style.display = 'block';
+                }
+            } catch (err) {
+                // QR生成失敗時は非表示のまま
+            }
+        }
+
+        // 地図を表示ボタン
+        document.getElementById('mapBtn').addEventListener('click', async function() {
+            const address = document.getElementById('address').value.trim();
+            const coordinates = document.getElementById('coordinates').value.trim();
+
+            if (!address && !coordinates) {
+                alert('住所または座標を入力してください。');
+                return;
+            }
+
+            const btn = this;
+            btn.textContent = '検索中...';
+            btn.disabled = true;
+
+            try {
+                const params = new URLSearchParams({
+                    address: address,
+                    coordinates: coordinates
+                });
+                const response = await fetch('/get-coordinates?' + params);
+                const data = await response.json();
+
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    // Google Mapsを開く
+                    const url = `https://www.google.com/maps?q=${data.lat},${data.lng}`;
+                    window.open(url, '_blank');
+                    // QRコードも表示
+                    showQRCode(data.lat, data.lng);
+                }
+            } catch (err) {
+                alert('エラーが発生しました: ' + err.message);
+            } finally {
+                btn.textContent = '地図を表示';
+                btn.disabled = false;
+            }
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

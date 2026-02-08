@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新規登録 - 地図PDF作成サービス</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>地図PDF作成サービス</h1>
+            <p class="subtitle">新規登録</p>
+        </header>
+
+        <form class="auth-form" action="/register" method="post">
+            {% if error %}
+            <div class="error-message">{{ error }}</div>
+            {% endif %}
+
+            <div class="form-group">
+                <label for="email">メールアドレス <span class="required">*</span></label>
+                <input type="email" id="email" name="email" required placeholder="example@company.com">
+            </div>
+
+            <div class="form-group">
+                <label for="company_name">会社名</label>
+                <input type="text" id="company_name" name="company_name" placeholder="株式会社○○">
+            </div>
+
+            <div class="form-group">
+                <label for="password">パスワード <span class="required">*</span></label>
+                <input type="password" id="password" name="password" required minlength="6" placeholder="6文字以上">
+            </div>
+
+            <div class="form-group">
+                <label for="password_confirm">パスワード（確認） <span class="required">*</span></label>
+                <input type="password" id="password_confirm" name="password_confirm" required placeholder="もう一度入力">
+            </div>
+
+            <button type="submit" class="submit-btn">登録する</button>
+        </form>
+
+        <div class="auth-links">
+            <p>既にアカウントをお持ちの方は <a href="/login">ログイン</a></p>
+            <p><a href="/">DEMOを試す（登録なし）</a></p>
+        </div>
+
+        <footer>
+            <p>外構・エクステリア業者様向け 地図PDF作成サービス</p>
+        </footer>
+    </div>
+</body>
+</html>

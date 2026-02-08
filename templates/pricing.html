@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>料金プラン - 地図PDF作成サービス</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .pricing-container {
+            max-width: 800px;
+        }
+
+        .pricing-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .pricing-header h2 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .pricing-header p {
+            color: #666;
+        }
+
+        .pricing-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .pricing-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 2px solid transparent;
+        }
+
+        .pricing-card.current {
+            border-color: #3498db;
+        }
+
+        .pricing-card.recommended {
+            border-color: #27ae60;
+        }
+
+        .pricing-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .plan-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .plan-name.demo { color: #e67e22; }
+        .plan-name.lite { color: #27ae60; }
+        .plan-name.standard { color: #3498db; }
+
+        .plan-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .plan-badge.current {
+            background: #ebf5fb;
+            color: #3498db;
+        }
+
+        .plan-badge.recommended {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+
+        .plan-price {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .plan-price span {
+            font-size: 1rem;
+            font-weight: normal;
+            color: #666;
+        }
+
+        .plan-description {
+            color: #666;
+            margin-bottom: 16px;
+        }
+
+        .plan-features {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 20px;
+        }
+
+        .plan-features li {
+            padding: 6px 0;
+            padding-left: 24px;
+            position: relative;
+            color: #555;
+        }
+
+        .plan-features li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .plan-action {
+            text-align: center;
+        }
+
+        .plan-action .submit-btn,
+        .plan-action .map-btn {
+            display: inline-block;
+            width: 100%;
+            padding: 14px;
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .plan-action .disabled-btn {
+            background: #bdc3c7;
+            color: white;
+            padding: 14px;
+            border-radius: 8px;
+            display: block;
+            cursor: not-allowed;
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .back-link a {
+            color: #3498db;
+            text-decoration: none;
+        }
+
+        .back-link a:hover {
+            text-decoration: underline;
+        }
+
+        .manage-subscription {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .manage-subscription h3 {
+            margin-bottom: 12px;
+            color: #2c3e50;
+        }
+
+        .manage-subscription p {
+            color: #666;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+        }
+
+        .manage-subscription a {
+            display: inline-block;
+            padding: 10px 24px;
+            background: #2c3e50;
+            color: white;
+            border-radius: 6px;
+            text-decoration: none;
+        }
+
+        .manage-subscription a:hover {
+            background: #34495e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container pricing-container">
+        <header>
+            <h1>地図PDF作成サービス</h1>
+            <p class="subtitle">料金プラン</p>
+        </header>
+
+        {% if user %}
+        <div class="user-bar">
+            <div class="user-info">
+                <span class="user-email">{{ user.email }}</span>
+                <span class="user-plan">現在のプラン: {{ current_plan_name }}</span>
+            </div>
+            <a href="/logout" class="logout-btn">ログアウト</a>
+        </div>
+        {% endif %}
+
+        <div class="pricing-header">
+            <h2>あなたに合ったプランを選択</h2>
+            <p>すべてのプランで地図PDF作成機能をご利用いただけます</p>
+        </div>
+
+        <div class="pricing-cards">
+            <!-- DEMOプラン -->
+            <div class="pricing-card {% if user and user.plan == 'demo' %}current{% endif %}">
+                <div class="pricing-card-header">
+                    <span class="plan-name demo">DEMO</span>
+                    {% if user and user.plan == 'demo' %}
+                    <span class="plan-badge current">現在のプラン</span>
+                    {% endif %}
+                </div>
+                <div class="plan-price">¥0 <span>/月</span></div>
+                <p class="plan-description">お試し用の無料プラン</p>
+                <ul class="plan-features">
+                    <li>月5回まで</li>
+                    <li>透かし入り</li>
+                    <li>基本機能のみ</li>
+                </ul>
+                <div class="plan-action">
+                    {% if user and user.plan == 'demo' %}
+                    <span class="disabled-btn">現在のプラン</span>
+                    {% else %}
+                    <span class="disabled-btn">ダウングレードはサポートページから</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- ライトプラン -->
+            <div class="pricing-card {% if user and user.plan == 'lite' %}current{% elif user and user.plan == 'demo' %}recommended{% endif %}">
+                <div class="pricing-card-header">
+                    <span class="plan-name lite">ライト</span>
+                    {% if user and user.plan == 'lite' %}
+                    <span class="plan-badge current">現在のプラン</span>
+                    {% elif user and user.plan == 'demo' %}
+                    <span class="plan-badge recommended">おすすめ</span>
+                    {% endif %}
+                </div>
+                <div class="plan-price">¥500 <span>/月</span></div>
+                <p class="plan-description">個人事業主向けプラン</p>
+                <ul class="plan-features">
+                    <li>月20回まで</li>
+                    <li>透かしなし</li>
+                    <li>全機能利用可能</li>
+                </ul>
+                <div class="plan-action">
+                    {% if user and user.plan == 'lite' %}
+                    <span class="disabled-btn">現在のプラン</span>
+                    {% elif user and user.plan == 'standard' %}
+                    <span class="disabled-btn">ダウングレードはサポートページから</span>
+                    {% elif user %}
+                    <a href="/checkout?plan=lite" class="map-btn">このプランを選択</a>
+                    {% else %}
+                    <a href="/register" class="map-btn">登録して選択</a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- スタンダードプラン -->
+            <div class="pricing-card {% if user and user.plan == 'standard' %}current{% endif %}">
+                <div class="pricing-card-header">
+                    <span class="plan-name standard">スタンダード</span>
+                    {% if user and user.plan == 'standard' %}
+                    <span class="plan-badge current">現在のプラン</span>
+                    {% endif %}
+                </div>
+                <div class="plan-price">¥980 <span>/月</span></div>
+                <p class="plan-description">チーム・企業向けプラン</p>
+                <ul class="plan-features">
+                    <li>月50回まで</li>
+                    <li>透かしなし</li>
+                    <li>全機能利用可能</li>
+                    <li>優先サポート</li>
+                </ul>
+                <div class="plan-action">
+                    {% if user and user.plan == 'standard' %}
+                    <span class="disabled-btn">現在のプラン</span>
+                    {% elif user %}
+                    <a href="/checkout?plan=standard" class="submit-btn">このプランを選択</a>
+                    {% else %}
+                    <a href="/register" class="submit-btn">登録して選択</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if user and user.plan != 'demo' %}
+        <div class="manage-subscription">
+            <h3>サブスクリプション管理</h3>
+            <p>お支払い方法の変更、請求履歴の確認、解約はこちらから</p>
+            <a href="/billing-portal">サブスクリプションを管理</a>
+        </div>
+        {% endif %}
+
+        <div class="back-link">
+            <a href="/">← トップに戻る</a>
+        </div>
+
+        <footer>
+            <p>外構・エクステリア業者様向け 地図PDF作成サービス</p>
+        </footer>
+    </div>
+</body>
+</html>
