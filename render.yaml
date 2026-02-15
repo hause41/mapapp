@@ -14,13 +14,3 @@ services:
         generateValue: true
       - key: GOOGLE_MAPS_API_KEY
         sync: false
-      - key: STRIPE_SECRET_KEY
-        sync: false
-      - key: STRIPE_PUBLISHABLE_KEY
-        sync: false
-      - key: STRIPE_WEBHOOK_SECRET
-        sync: false
-      - key: STRIPE_PRICE_LITE
-        sync: false
-      - key: STRIPE_PRICE_STANDARD
-        sync: false

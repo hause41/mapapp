@@ -18,23 +18,9 @@
         <div class="user-bar">
             <div class="user-info">
                 <span class="user-email">{{ user.email }}</span>
-                <span class="user-plan">
-                    <a href="/pricing" style="color: inherit; text-decoration: underline;">{{ plan_name }}</a>
-                    | 残り {{ remaining }}/{{ limit }}回
-                </span>
             </div>
             <a href="/logout" class="logout-btn">ログアウト</a>
         </div>
-
-        {% if remaining == 0 %}
-        <div class="error-message">
-            今月の利用上限に達しました。来月1日にリセットされます。
-        </div>
-        {% elif remaining <= 3 %}
-        <div class="warning-message">
-            残り{{ remaining }}回です。
-        </div>
-        {% endif %}
 
         <form id="pdfForm" action="/generate-pdf" method="post">
             <div class="form-group">
@@ -91,6 +77,9 @@
                 </button>
                 <button type="submit" class="submit-btn" id="submitBtn">
                     PDF資料を作成
+                </button>
+                <button type="button" class="clear-btn" id="clearBtn">
+                    クリア
                 </button>
             </div>
         </form>
@@ -184,6 +173,17 @@
                 // QR生成失敗時は非表示のまま
             }
         }
+
+        // クリアボタン
+        document.getElementById('clearBtn').addEventListener('click', function() {
+            document.getElementById('customer').value = '';
+            document.getElementById('property_name').value = '';
+            document.getElementById('address').value = '';
+            document.getElementById('coordinates').value = '';
+            document.getElementById('remarks').value = '';
+            document.querySelector('input[name="vehicle_type"][value="車種指定なし"]').checked = true;
+            document.getElementById('qrcodeArea').style.display = 'none';
+        });
 
         // 地図を表示ボタン
         document.getElementById('mapBtn').addEventListener('click', async function() {

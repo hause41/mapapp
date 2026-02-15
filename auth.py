@@ -66,7 +66,6 @@ def create_user(db: Session, email: str, password: str, company_name: str = None
         email=email,
         password_hash=hash_password(password),
         company_name=company_name,
-        plan="demo"
     )
     db.add(user)
     db.commit()

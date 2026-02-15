@@ -1,9 +1,8 @@
 import os
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Enum as SQLEnum
+from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import enum
 
 # データベースファイルのパス
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,13 +14,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-# プラン定義
-class PlanType(str, enum.Enum):
-    DEMO = "demo"
-    LITE = "lite"
-    STANDARD = "standard"
-
-
 # ユーザーモデル
 class User(Base):
     __tablename__ = "users"
@@ -29,17 +21,12 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
-    company_name = Column(String(255), nullable=True)  # 会社名
-    plan = Column(String(20), default=PlanType.DEMO.value)
-    # Stripe関連
-    stripe_customer_id = Column(String(255), nullable=True)  # Stripe顧客ID
-    stripe_subscription_id = Column(String(255), nullable=True)  # StripeサブスクリプションID
-    subscription_status = Column(String(50), nullable=True)  # active, canceled, past_due等
+    company_name = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
-# 使用ログモデル（回数カウント用）
+# 使用ログモデル
 class UsageLog(Base):
     __tablename__ = "usage_logs"
 

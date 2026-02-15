@@ -3,13 +3,21 @@ import re
 import base64
 import textwrap
 from io import BytesIO
-from enum import Enum
 from urllib.parse import quote, urlparse, parse_qs
-from datetime import datetime
+from pathlib import Path
+
+# .envファイルから環境変数を読み込み（ローカル開発用）
+_env_path = Path(__file__).parent / ".env"
+if _env_path.exists():
+    for line in _env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, _, value = line.partition("=")
+            os.environ.setdefault(key.strip(), value.strip())
 
 import requests
 from fastapi import FastAPI, Form, HTTPException, Request, Depends
-from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
@@ -20,12 +28,6 @@ from database import init_db, get_db, User, UsageLog
 from auth import (
     get_current_user, create_user, authenticate_user,
     set_session_cookie, clear_session_cookie
-)
-from stripe_handler import (
-    create_checkout_session, create_portal_session,
-    handle_checkout_completed, handle_subscription_updated,
-    handle_subscription_deleted, verify_webhook_signature,
-    PLAN_INFO, STRIPE_PRICE_IDS
 )
 
 # 定数
@@ -41,66 +43,15 @@ def mm_to_px(mm):
 A4_WIDTH_PX = mm_to_px(A4_WIDTH_MM)
 A4_HEIGHT_PX = mm_to_px(A4_HEIGHT_MM)
 
-# APIキー（環境変数から取得、なければデフォルト値）
-API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY")
-if not API_KEY:
-    raise RuntimeError("GOOGLE_MAPS_API_KEY environment variable is required")
+# APIキー（環境変数から取得）
+API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 
 # フォントパス
 def get_font_path():
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts", "msgothic.ttc")
 
-# プラン定義
-class Plan(str, Enum):
-    DEMO = "demo"
-    LITE = "lite"
-    STANDARD = "standard"
-
-PLAN_CONFIG = {
-    Plan.DEMO: {"map_count": 2, "watermark": True, "monthly_limit": 5},
-    Plan.LITE: {"map_count": 2, "watermark": False, "monthly_limit": 20},
-    Plan.STANDARD: {"map_count": 2, "watermark": False, "monthly_limit": 50},
-}
-
-# プラン表示名
-PLAN_NAMES = {
-    "demo": "DEMO",
-    "lite": "ライト",
-    "standard": "スタンダード",
-}
-
-# プラン別月間上限
-PLAN_LIMITS = {
-    "demo": 5,
-    "lite": 20,
-    "standard": 50,
-}
-
 # ベースディレクトリ
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
-def get_monthly_usage_count(db: Session, user_id: int) -> int:
-    """今月の使用回数を取得"""
-    now = datetime.utcnow()
-    first_day_of_month = datetime(now.year, now.month, 1)
-    count = db.query(UsageLog).filter(
-        UsageLog.user_id == user_id,
-        UsageLog.created_at >= first_day_of_month
-    ).count()
-    return count
-
-
-def get_remaining_count(db: Session, user: User) -> int:
-    """残り回数を取得"""
-    limit = PLAN_LIMITS.get(user.plan, 5)
-    used = get_monthly_usage_count(db, user.id)
-    return max(0, limit - used)
-
-
-def can_generate_pdf(db: Session, user: User) -> bool:
-    """PDF生成可能かどうかをチェック"""
-    return get_remaining_count(db, user) > 0
 
 
 # FastAPIアプリ
@@ -200,7 +151,6 @@ def expand_short_url(url_text: str) -> str:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     resp = requests.get(url_text, headers=headers, allow_redirects=True, timeout=15)
-    print(f"[DEBUG] 短縮URL展開結果: {resp.url}")
     return resp.url
 
 
@@ -214,14 +164,12 @@ def parse_google_maps_url(url_text: str):
     if "goo.gl" in url_text or "maps.app" in url_text:
         try:
             url_text = expand_short_url(url_text)
-        except Exception as e:
-            print(f"[DEBUG] 短縮URL展開失敗: {e}")
+        except Exception:
             return None
 
     # 展開後のURLからパース
     result = extract_coords_from_url(url_text)
     if result:
-        print(f"[DEBUG] 座標抽出成功: {result}")
         return result
 
     # URLに座標が無い場合、qパラメータの住所をGeocoding APIで解決
@@ -229,7 +177,6 @@ def parse_google_maps_url(url_text: str):
     params = parse_qs(parsed.query)
     q_val = params.get("q", [None])[0]
     if q_val and not re.match(r'^-?\d+\.?\d*,', q_val):
-        print(f"[DEBUG] qパラメータの住所をGeocoding: {q_val}")
         try:
             geocode_resp = requests.get(
                 "https://maps.googleapis.com/maps/api/geocode/json",
@@ -239,12 +186,10 @@ def parse_google_maps_url(url_text: str):
             geocode_data = geocode_resp.json()
             if geocode_data.get("status") == "OK":
                 loc = geocode_data["results"][0]["geometry"]["location"]
-                print(f"[DEBUG] Geocoding成功: {loc['lat']}, {loc['lng']}")
                 return loc["lat"], loc["lng"]
-        except Exception as e:
-            print(f"[DEBUG] Geocoding失敗: {e}")
+        except Exception:
+            pass
 
-    print(f"[DEBUG] 座標抽出失敗 URL: {url_text}")
     return None
 
 
@@ -338,61 +283,32 @@ def fetch_map_image(latitude, longitude, zoom):
     return map_image
 
 
-def add_watermark(image, text="DEMO"):
-    """画像に透かしを追加"""
-    draw = ImageDraw.Draw(image)
-
-    try:
-        font = ImageFont.truetype(get_font_path(), 200)
-    except:
-        font = ImageFont.load_default()
-
-    bbox = draw.textbbox((0, 0), text, font=font)
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
-
-    x = (image.width - text_width) // 2
-    y = (image.height - text_height) // 2
-
-    draw.text((x, y), text, font=font, fill=(255, 0, 0, 128))
-
-    return image
-
-
-def generate_pdf(data: dict, plan: Plan) -> BytesIO:
+def generate_pdf(data: dict) -> BytesIO:
     """PDF生成メイン処理"""
-    config = PLAN_CONFIG[plan]
-
     latitude, longitude = resolve_coordinates(data["coordinates"], data["address"])
 
     remarks = textwrap.fill(data["remarks"] or "", width=15, subsequent_indent="     ")
     vehicle_type_text = data["vehicle_type"]
 
-    # 地図取得
-    if config["map_count"] == 1:
-        map_images = [fetch_map_image(latitude, longitude, 17)]
-    else:
-        map_images = [
-            fetch_map_image(latitude, longitude, 14),
-            fetch_map_image(latitude, longitude, 17),
-        ]
+    # 地図取得（広域zoom14 + 詳細zoom17の2枚）
+    map_images = [
+        fetch_map_image(latitude, longitude, 14),
+        fetch_map_image(latitude, longitude, 17),
+    ]
 
     margin_px = mm_to_px(DEFAULT_MARGIN_MM)
 
-    if len(map_images) == 1:
-        combined_image = map_images[0]
-    else:
-        separator_w = 6
-        combined_width = map_images[0].width + separator_w + map_images[1].width
-        combined_height = max(img.height for img in map_images)
+    separator_w = 6
+    combined_width = map_images[0].width + separator_w + map_images[1].width
+    combined_height = max(img.height for img in map_images)
 
-        combined_image = Image.new("RGB", (combined_width, combined_height), "white")
-        combined_image.paste(map_images[0], (0, 0))
-        combined_image.paste(map_images[1], (map_images[0].width + separator_w, 0))
+    combined_image = Image.new("RGB", (combined_width, combined_height), "white")
+    combined_image.paste(map_images[0], (0, 0))
+    combined_image.paste(map_images[1], (map_images[0].width + separator_w, 0))
 
-        draw_sep = ImageDraw.Draw(combined_image)
-        x0 = map_images[0].width
-        draw_sep.rectangle((x0, 0, x0 + separator_w - 1, combined_height), fill="black")
+    draw_sep = ImageDraw.Draw(combined_image)
+    x0 = map_images[0].width
+    draw_sep.rectangle((x0, 0, x0 + separator_w - 1, combined_height), fill="black")
 
     final_width, final_height = A4_WIDTH_PX, A4_HEIGHT_PX
     final_canvas = Image.new("RGB", (final_width, final_height), "white")
@@ -478,9 +394,6 @@ def generate_pdf(data: dict, plan: Plan) -> BytesIO:
         fill="white", outline="black", width=1
     )
     final_canvas.paste(qr_img, (qr_x, qr_y))
-
-    if config["watermark"]:
-        final_canvas = add_watermark(final_canvas)
 
     pdf_buffer = BytesIO()
     pdf_info = {"Title": f"{data['property_name']} {data['address']}"}
@@ -568,32 +481,6 @@ async def logout():
     return response
 
 
-# ========== ランディング・法的ページ ==========
-
-@app.get("/lp", response_class=HTMLResponse)
-async def landing_page(request: Request):
-    """ランディングページ"""
-    return templates.TemplateResponse("landing.html", {"request": request})
-
-
-@app.get("/terms", response_class=HTMLResponse)
-async def terms_page(request: Request):
-    """利用規約"""
-    return templates.TemplateResponse("terms.html", {"request": request})
-
-
-@app.get("/privacy", response_class=HTMLResponse)
-async def privacy_page(request: Request):
-    """プライバシーポリシー"""
-    return templates.TemplateResponse("privacy.html", {"request": request})
-
-
-@app.get("/legal", response_class=HTMLResponse)
-async def legal_page(request: Request):
-    """特定商取引法に基づく表記"""
-    return templates.TemplateResponse("legal.html", {"request": request})
-
-
 # ========== メインルート ==========
 
 @app.get("/", response_class=HTMLResponse)
@@ -601,19 +488,9 @@ async def index(request: Request, db: Session = Depends(get_db)):
     """メインページ"""
     user = get_current_user(request, db)
 
-    # 残り回数と上限を計算
-    remaining = 0
-    limit = 0
-    if user:
-        remaining = get_remaining_count(db, user)
-        limit = PLAN_LIMITS.get(user.plan, 5)
-
     context = {
         "request": request,
         "user": user,
-        "plan_name": PLAN_NAMES.get(user.plan, "DEMO") if user else "DEMO",
-        "remaining": remaining,
-        "limit": limit,
     }
     return templates.TemplateResponse("index.html", context)
 
@@ -682,27 +559,6 @@ async def generate_pdf_endpoint(
     if not user:
         return RedirectResponse(url="/login", status_code=303)
 
-    # 回数制限チェック
-    if not can_generate_pdf(db, user):
-        # 回数上限に達した場合、エラーページを表示
-        remaining = get_remaining_count(db, user)
-        limit = PLAN_LIMITS.get(user.plan, 5)
-        return templates.TemplateResponse("limit_reached.html", {
-            "request": request,
-            "user": user,
-            "plan_name": PLAN_NAMES.get(user.plan, "DEMO"),
-            "limit": limit,
-        })
-
-    # ユーザーのプランを使用
-    plan = user.plan
-
-    # プラン検証
-    try:
-        plan_enum = Plan(plan.lower())
-    except ValueError:
-        plan_enum = Plan.DEMO
-
     data = {
         "address": address.strip(),
         "coordinates": coordinates.strip(),
@@ -713,13 +569,12 @@ async def generate_pdf_endpoint(
     }
 
     # PDF生成
-    pdf_buffer = generate_pdf(data, plan_enum)
+    pdf_buffer = generate_pdf(data)
 
-    # 使用ログ記録（ログインユーザーのみ）
-    if user:
-        usage_log = UsageLog(user_id=user.id)
-        db.add(usage_log)
-        db.commit()
+    # 使用ログ記録
+    usage_log = UsageLog(user_id=user.id)
+    db.add(usage_log)
+    db.commit()
 
     # ファイル名生成
     address_for_filename = data["address"] or data["coordinates"]
@@ -733,137 +588,6 @@ async def generate_pdf_endpoint(
             "Content-Disposition": f"attachment; filename*=UTF-8''{filename_encoded}"
         }
     )
-
-
-# ========== Stripe関連ルート ==========
-
-@app.get("/pricing", response_class=HTMLResponse)
-async def pricing_page(request: Request, db: Session = Depends(get_db)):
-    """料金プランページ"""
-    user = get_current_user(request, db)
-
-    context = {
-        "request": request,
-        "user": user,
-        "current_plan_name": PLAN_NAMES.get(user.plan, "DEMO") if user else "DEMO",
-        "plans": PLAN_INFO,
-    }
-    return templates.TemplateResponse("pricing.html", context)
-
-
-@app.get("/checkout")
-async def checkout(
-    request: Request,
-    plan: str,
-    db: Session = Depends(get_db)
-):
-    """Stripeチェックアウトへリダイレクト"""
-    user = get_current_user(request, db)
-
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-
-    if plan not in STRIPE_PRICE_IDS:
-        return RedirectResponse(url="/pricing", status_code=303)
-
-    # 現在のプランと同じ、または下位プランへの変更は不可
-    plan_order = {"demo": 0, "lite": 1, "standard": 2}
-    if plan_order.get(plan, 0) <= plan_order.get(user.plan, 0):
-        return RedirectResponse(url="/pricing", status_code=303)
-
-    # ベースURL取得
-    base_url = str(request.base_url).rstrip("/")
-    success_url = f"{base_url}/checkout/success?session_id={{CHECKOUT_SESSION_ID}}"
-    cancel_url = f"{base_url}/checkout/cancel"
-
-    try:
-        checkout_url = create_checkout_session(
-            db, user, plan, success_url, cancel_url
-        )
-        return RedirectResponse(url=checkout_url, status_code=303)
-    except Exception as e:
-        # エラー時は料金ページに戻る
-        return RedirectResponse(url="/pricing", status_code=303)
-
-
-@app.get("/checkout/success", response_class=HTMLResponse)
-async def checkout_success(request: Request, db: Session = Depends(get_db)):
-    """決済成功ページ"""
-    user = get_current_user(request, db)
-
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-
-    # 最新のユーザー情報を取得（Webhookで更新されている可能性）
-    db.refresh(user)
-
-    limit = PLAN_LIMITS.get(user.plan, 5)
-
-    context = {
-        "request": request,
-        "user": user,
-        "plan_name": PLAN_NAMES.get(user.plan, "DEMO"),
-        "limit": limit,
-    }
-    return templates.TemplateResponse("checkout_success.html", context)
-
-
-@app.get("/checkout/cancel", response_class=HTMLResponse)
-async def checkout_cancel(request: Request, db: Session = Depends(get_db)):
-    """決済キャンセルページ"""
-    user = get_current_user(request, db)
-
-    context = {
-        "request": request,
-        "user": user,
-    }
-    return templates.TemplateResponse("checkout_cancel.html", context)
-
-
-@app.get("/billing-portal")
-async def billing_portal(request: Request, db: Session = Depends(get_db)):
-    """Stripeカスタマーポータルへリダイレクト"""
-    user = get_current_user(request, db)
-
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
-
-    if not user.stripe_customer_id:
-        return RedirectResponse(url="/pricing", status_code=303)
-
-    base_url = str(request.base_url).rstrip("/")
-    return_url = f"{base_url}/pricing"
-
-    try:
-        portal_url = create_portal_session(db, user, return_url)
-        return RedirectResponse(url=portal_url, status_code=303)
-    except Exception as e:
-        return RedirectResponse(url="/pricing", status_code=303)
-
-
-@app.post("/webhook/stripe")
-async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
-    """Stripe Webhook処理"""
-    payload = await request.body()
-    signature = request.headers.get("stripe-signature", "")
-
-    try:
-        event = verify_webhook_signature(payload, signature)
-    except ValueError as e:
-        return JSONResponse(status_code=400, content={"error": str(e)})
-
-    event_type = event.get("type")
-    data = event.get("data", {}).get("object", {})
-
-    # イベント種別に応じた処理
-    if event_type == "checkout.session.completed":
-        handle_checkout_completed(db, data)
-    elif event_type == "customer.subscription.updated":
-        handle_subscription_updated(db, data)
-    elif event_type == "customer.subscription.deleted":
-        handle_subscription_deleted(db, data)
-
-    return JSONResponse(content={"status": "success"})
 
 
 if __name__ == "__main__":

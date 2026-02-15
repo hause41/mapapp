@@ -209,6 +209,23 @@ form {
     cursor: not-allowed;
 }
 
+.clear-btn {
+    flex: 1;
+    padding: 16px;
+    background: #95a5a6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.clear-btn:hover {
+    background: #7f8c8d;
+}
+
 /* 認証フォーム */
 .auth-form {
     margin-bottom: 20px;
