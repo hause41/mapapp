@@ -507,6 +507,47 @@ async def get_coordinates_api(address: str = "", coordinates: str = ""):
         return {"error": str(e)}
 
 
+@app.get("/api-check")
+async def api_check():
+    """APIキー動作確認用エンドポイント"""
+    if not API_KEY:
+        return {"status": "error", "message": "GOOGLE_MAPS_API_KEY が未設定です"}
+
+    # Geocoding APIテスト
+    try:
+        resp = requests.get(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+            params={"address": "東京駅", "key": API_KEY, "language": "ja"},
+            timeout=10,
+        )
+        geocode_data = resp.json()
+        geocode_status = geocode_data.get("status")
+        geocode_error = geocode_data.get("error_message", "")
+    except Exception as e:
+        geocode_status = "EXCEPTION"
+        geocode_error = str(e)
+
+    # Static Maps APIテスト
+    try:
+        resp2 = requests.get(
+            "https://maps.googleapis.com/maps/api/staticmap",
+            params={"center": "35.6812,139.7671", "zoom": "14", "size": "100x100", "key": API_KEY},
+            timeout=10,
+        )
+        static_status = resp2.status_code
+        static_content_type = resp2.headers.get("Content-Type", "")
+    except Exception as e:
+        static_status = "EXCEPTION"
+        static_content_type = str(e)
+
+    return {
+        "api_key_set": True,
+        "api_key_prefix": API_KEY[:10] + "...",
+        "geocoding_api": {"status": geocode_status, "error": geocode_error},
+        "static_maps_api": {"http_status": static_status, "content_type": static_content_type},
+    }
+
+
 @app.get("/parse-maps-url")
 async def parse_maps_url_api(url: str = ""):
     """Google Maps URLから座標を抽出するAPI"""
