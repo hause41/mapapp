@@ -37,7 +37,10 @@ class UsageLog(Base):
 
 # テーブル作成
 def init_db():
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception:
+        pass  # 他のワーカーが既にテーブル作成済みの場合は無視
 
 
 # データベースセッション取得
