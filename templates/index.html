@@ -186,7 +186,7 @@
         });
 
         // 地図を表示ボタン
-        document.getElementById('mapBtn').addEventListener('click', async function() {
+        document.getElementById('mapBtn').addEventListener('click', function() {
             const address = document.getElementById('address').value.trim();
             const coordinates = document.getElementById('coordinates').value.trim();
 
@@ -199,29 +199,38 @@
             btn.textContent = '検索中...';
             btn.disabled = true;
 
-            try {
-                const params = new URLSearchParams({
-                    address: address,
-                    coordinates: coordinates
-                });
-                const response = await fetch('/get-coordinates?' + params);
-                const data = await response.json();
+            // iOS Safari対策: ユーザークリックの同期処理内でウィンドウを開く
+            const mapWindow = window.open('about:blank', '_blank');
 
-                if (data.error) {
-                    alert(data.error);
-                } else {
-                    // Google Mapsを開く
-                    const url = `https://www.google.com/maps?q=${data.lat},${data.lng}`;
-                    window.open(url, '_blank');
-                    // QRコードも表示
-                    showQRCode(data.lat, data.lng);
-                }
-            } catch (err) {
-                alert('エラーが発生しました: ' + err.message);
-            } finally {
-                btn.textContent = '地図を表示';
-                btn.disabled = false;
-            }
+            const params = new URLSearchParams({
+                address: address,
+                coordinates: coordinates
+            });
+            fetch('/get-coordinates?' + params)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        if (mapWindow) mapWindow.close();
+                        alert(data.error);
+                    } else {
+                        const url = `https://www.google.com/maps?q=${data.lat},${data.lng}`;
+                        if (mapWindow) {
+                            mapWindow.location.href = url;
+                        } else {
+                            // ポップアップがブロックされた場合はリンクとして開く
+                            window.location.href = url;
+                        }
+                        showQRCode(data.lat, data.lng);
+                    }
+                })
+                .catch(err => {
+                    if (mapWindow) mapWindow.close();
+                    alert('エラーが発生しました: ' + err.message);
+                })
+                .finally(() => {
+                    btn.textContent = '地図を表示';
+                    btn.disabled = false;
+                });
         });
     </script>
     {% endif %}
